@@ -36,7 +36,7 @@ public class DataSourceFactory implements org.springframework.beans.factory.Fact
                     newInstance.setJdbcUrl(jdbcUrl);
                     newInstance.setDriverClass(config.getString("driverClass", "com.mysql.jdbc.Driver"));
                     newInstance.setInitialPoolSize(config.getInt("initialPoolSize", 3));
-                    newInstance.setMaxPoolSize(config.getInt("maxPoolSize", 25));
+                    newInstance.setMaxPoolSize(config.getInt("maxPoolSize", 10));
                     newInstance.setMinPoolSize(config.getInt("minPoolSize", 3));
                     newInstance.setIdleConnectionTestPeriod(config.getInt("idleConnectionTestPeriod", 120));
                     newInstance.setAutoCommitOnClose(config.getBoolean("autoCommitOnClose", false));
