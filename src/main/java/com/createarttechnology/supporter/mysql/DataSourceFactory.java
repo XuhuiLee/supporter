@@ -3,22 +3,26 @@ package com.createarttechnology.supporter.mysql;
 import com.createarttechnology.config.Config;
 import com.createarttechnology.config.ConfigFactory;
 import com.createarttechnology.config.ConfigWatcher;
+import com.createarttechnology.logger.Logger;
 import com.google.common.base.Preconditions;
 import com.mchange.v2.c3p0.ComboPooledDataSource;
+import org.springframework.beans.factory.FactoryBean;
 
 /**
  * Created by lixuhui on 2018/11/14.
  */
-public class DataSourceFactory implements org.springframework.beans.factory.FactoryBean {
+public class DataSourceFactory implements FactoryBean {
+
+    private static final Logger logger = Logger.getLogger(DataSourceFactory.class);
 
     private String configName;
-    private ComboPooledDataSource dataSource;
+    private static volatile ComboPooledDataSource INSTANCE;
 
     public void setConfig(String configName) {
         this.configName = configName;
     }
 
-    public void init() {
+    private void init() {
         final ComboPooledDataSource newInstance = new ComboPooledDataSource();
         ConfigFactory.load(configName, new ConfigWatcher() {
             @Override
@@ -43,24 +47,25 @@ public class DataSourceFactory implements org.springframework.beans.factory.Fact
                     newInstance.setCheckoutTimeout(config.getInt("checkoutTimeout", 3000));
                     newInstance.setMaxIdleTime(config.getInt("maxIdleTime", 600));
                     newInstance.setMaxStatementsPerConnection(config.getInt("maxStatementsPerConnection", 5));
+                    logger.info("[use jdbc: {}]", jdbcUrl);
                 } catch (Exception e) {
-
+                    logger.error("init DataSourceFactory error, configName={}, e:", configName, e);
                 }
             }
         });
-        this.dataSource = newInstance;
+        INSTANCE = newInstance;
     }
 
     @Override
     public Object getObject() throws Exception {
-        if (dataSource == null) {
-            synchronized (this) {
-                if (dataSource == null) {
+        if (INSTANCE == null) {
+            synchronized (DataSourceFactory.class) {
+                if (INSTANCE == null) {
                     init();
                 }
             }
         }
-        return dataSource;
+        return INSTANCE;
     }
 
     @Override
