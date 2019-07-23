@@ -31,14 +31,16 @@ public class JedisFactory implements FactoryBean {
                 int port = config.getInt("port", 6379);
                 int timeout = config.getInt("timeout", 3000);
                 String password = config.getString("password", null);
+                int database = config.getInt("database", 1);
 
 
                 try {
-                    JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), host, port, timeout, password);
+
+                    JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), host, port, timeout, password, database);
                     if (INSTANCE == null) {
                         INSTANCE = jedisPool.getResource();
                     }
-                    logger.info("[use redis: {}:{}]", host, port);
+                    logger.info("[use redis: {}:{}, database:{}]", host, port, database);
                 } catch (Exception e) {
                     logger.error("init JedisFactory error, configName={}, e:", configName, e);
                 }
