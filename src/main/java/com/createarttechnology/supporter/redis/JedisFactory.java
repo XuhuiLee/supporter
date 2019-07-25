@@ -38,10 +38,13 @@ public class JedisFactory implements FactoryBean {
                 int timeout = config.getInt("timeout", 3000);
                 String password = config.getString("password", null);
                 int database = config.getInt("database", 1);
+                int maxTotal = config.getInt("maxTotal", 5);
 
                 try {
                     JedisPool oldPool = POOL;
-                    POOL = new JedisPool(new JedisPoolConfig(), host, port, timeout, password, database);
+                    JedisPoolConfig poolConfig = new JedisPoolConfig();
+                    poolConfig.setMaxTotal(maxTotal);
+                    POOL = new JedisPool(poolConfig, host, port, timeout, password, database);
                     if (oldPool != null) {
                         oldPool.destroy();
                     }
@@ -67,7 +70,9 @@ public class JedisFactory implements FactoryBean {
             public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
                 try {
                     Jedis jedis = POOL.getResource();
-                    return method.invoke(jedis, args);
+                    Object result = method.invoke(jedis, args);
+                    jedis.close();
+                    return result;
                 } catch (JedisConnectionException | ClassCastException e) {
                     logger.info("error, e:", e);
                     return null;

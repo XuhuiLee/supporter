@@ -5,6 +5,7 @@ import com.createarttechnology.config.ConfigFactory;
 import com.createarttechnology.config.ConfigWatcher;
 import com.createarttechnology.constant.RedisKeys;
 import com.createarttechnology.jutil.StringUtil;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
@@ -14,7 +15,7 @@ import redis.clients.jedis.JedisPoolConfig;
  */
 public final class LoginClient {
 
-    private static volatile JedisPool INSTANCE;
+    private static volatile JedisPool POOL;
 
     private static final String CONFIG_NAME = "redis-blog";
 
@@ -29,8 +30,11 @@ public final class LoginClient {
                     int port = config.getInt("port", 6379);
                     int timeout = config.getInt("timeout", 3000);
                     String password = config.getString("password", null);
+                    int maxTotal = config.getInt("maxTotal", 5);
 
-                    INSTANCE = new JedisPool(new JedisPoolConfig(), host, port, timeout, password);
+                    JedisPoolConfig poolConfig = new JedisPoolConfig();
+                    poolConfig.setMaxTotal(maxTotal);
+                    POOL = new JedisPool(poolConfig, host, port, timeout, password);
                 }
             });
         }
@@ -41,14 +45,18 @@ public final class LoginClient {
             return false;
         }
         String redisKey = RedisKeys.REDIS_UID_PREFIX + loginKey;
-        String redisToken = INSTANCE.getResource().get(redisKey);
+        Jedis resource = POOL.getResource();
+        String redisToken = resource.get(redisKey);
+        resource.close();
         return loginToken.equals(redisToken);
     }
 
     public static void setLogin(long loginKey, String loginToken) {
         String userKey = RedisKeys.REDIS_UID_PREFIX + loginKey;
         // 保留一个月
-        INSTANCE.getResource().setex(userKey, 2592000, loginToken);
+        Jedis resource = POOL.getResource();
+        resource.setex(userKey, 2592000, loginToken);
+        resource.close();
     }
 
 }
