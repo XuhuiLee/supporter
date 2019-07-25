@@ -4,10 +4,16 @@ import com.createarttechnology.config.Config;
 import com.createarttechnology.config.ConfigFactory;
 import com.createarttechnology.config.ConfigWatcher;
 import com.createarttechnology.logger.Logger;
+import com.google.common.reflect.Reflection;
 import org.springframework.beans.factory.FactoryBean;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.commands.JedisCommands;
+import redis.clients.jedis.exceptions.JedisConnectionException;
+
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
 
 /**
  * Created by lixuhui on 2019/7/22.
@@ -17,7 +23,7 @@ public class JedisFactory implements FactoryBean {
     private static final Logger logger = Logger.getLogger(JedisFactory.class);
 
     private String configName;
-    private static volatile Jedis INSTANCE;
+    private static volatile JedisPool POOL;
 
     public void setConfig(String configName) {
         this.configName = configName;
@@ -33,12 +39,11 @@ public class JedisFactory implements FactoryBean {
                 String password = config.getString("password", null);
                 int database = config.getInt("database", 1);
 
-
                 try {
-
-                    JedisPool jedisPool = new JedisPool(new JedisPoolConfig(), host, port, timeout, password, database);
-                    if (INSTANCE == null) {
-                        INSTANCE = jedisPool.getResource();
+                    JedisPool oldPool = POOL;
+                    POOL = new JedisPool(new JedisPoolConfig(), host, port, timeout, password, database);
+                    if (oldPool != null) {
+                        oldPool.destroy();
                     }
                     logger.info("[use redis: {}:{}, database:{}]", host, port, database);
                 } catch (Exception e) {
@@ -48,26 +53,36 @@ public class JedisFactory implements FactoryBean {
         });
     }
 
-
     @Override
     public Object getObject() throws Exception {
-        if (INSTANCE == null) {
+        if (POOL == null) {
             synchronized (JedisFactory.class) {
-                if (INSTANCE == null) {
+                if (POOL == null) {
                     init();
                 }
             }
         }
-        return INSTANCE;
+        return Reflection.newProxy(JedisCommands.class, new InvocationHandler() {
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                try {
+                    Jedis jedis = POOL.getResource();
+                    return method.invoke(jedis, args);
+                } catch (JedisConnectionException | ClassCastException e) {
+                    logger.info("error, e:", e);
+                    return null;
+                }
+            }
+        });
     }
 
     @Override
     public Class<?> getObjectType() {
-        return Jedis.class;
+        return JedisCommands.class;
     }
 
     @Override
     public boolean isSingleton() {
-        return true;
+        return false;
     }
 }
